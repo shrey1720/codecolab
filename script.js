@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_BASE_URL = 'https://ajt-be-3.onrender.com/api';
 
 // State Management
 let currentUser = JSON.parse(localStorage.getItem('user'));
@@ -40,7 +40,7 @@ function updateAuthUI() {
 async function fetchQuestions(filter = '') {
     const list = document.getElementById('questionsList');
     const title = document.getElementById('feedTitle');
-    
+
     // Update active UI state
     document.querySelectorAll('.sidebar nav a').forEach(a => a.classList.remove('active'));
     if (filter) {
@@ -106,7 +106,7 @@ async function loadQuestionDetails(id) {
     try {
         const response = await fetch(`${API_BASE_URL}/question/${id}`);
         const q = await response.json();
-        
+
         const detail = document.getElementById('questionDetail');
         const tagsHtml = q.tags ? q.tags.split(',').map(t => `<span class="tag">${t.trim()}</span>`).join('') : '';
         const codeHtml = q.code ? `<div class="code-block"><pre><code>${escapeHtml(q.code)}</code></pre></div>` : '';
@@ -133,7 +133,7 @@ async function loadQuestionDetails(id) {
                 <button class="btn-primary" style="padding: 0.5rem 1rem;" onclick="addComment(${q.id}, 'question')">Post</button>
             </div>
         `;
-        
+
         loadAnswers(id);
         loadComments(id, 'question', 'questionComments');
     } catch (err) {
@@ -147,7 +147,7 @@ async function loadAnswers(qId) {
         const response = await fetch(`${API_BASE_URL}/answers/${qId}`);
         const answers = await response.json();
         document.getElementById('answerCount').innerText = `${answers.length} Solutions`;
-        
+
         list.innerHTML = '';
         answers.forEach(a => {
             const card = document.createElement('div');
@@ -195,7 +195,7 @@ async function loadComments(id, type, containerId) {
 
 async function addComment(parentId, type) {
     if (!currentUser) return alert("Login required to comment");
-    
+
     const inputId = type === 'question' ? 'qCommentInput' : `ansCommentInput-${parentId}`;
     const input = document.getElementById(inputId);
     const text = input.value.trim();
@@ -267,7 +267,7 @@ function closeAnswerModal() {
 async function submitAnswer() {
     const text = document.getElementById('ansText').value;
     const qId = new URLSearchParams(window.location.search).get('id');
-    
+
     try {
         const response = await fetch(`${API_BASE_URL}/answer`, {
             method: 'POST',
