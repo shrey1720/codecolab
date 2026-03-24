@@ -7,7 +7,7 @@ let currentFilter = 'home';
 // Initialization
 document.addEventListener('DOMContentLoaded', () => {
     updateAuthUI();
-    if (window.location.pathname.endsWith('index.html') || window.location.pathname === '/' || window.location.pathname.endsWith('ajt_proj/frontend/')) {
+    if (window.location.pathname.endsWith('index.html') || window.location.pathname === '/' || window.location.pathname.endsWith('/')) {
         fetchQuestions();
         fetchTopContributors();
     }
