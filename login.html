@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Join CodeCollab</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body style="display:flex; align-items:center; justify-content:center;">
+    <div class="auth-container">
+        <a href="index.html" class="logo" style="text-align:center; margin-bottom: 2rem;">CodeCollab</a>
+        
+        <div id="loginForm">
+            <h2 style="margin-bottom: 1.5rem;">Welcome Back</h2>
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="loginUsername" class="form-input">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="loginPassword" class="form-input">
+            </div>
+            <button class="btn-primary" style="width:100%; margin-top: 1rem;" onclick="login()">Login</button>
+            <p style="margin-top: 1.5rem; text-align:center; color:var(--text-dim);">
+                New here? <a href="#" style="color:var(--primary);" onclick="toggleAuth()">Create an account</a>
+            </p>
+        </div>
+
+        <div id="registerForm" style="display:none;">
+            <h2 style="margin-bottom: 1.5rem;">Create Account</h2>
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="regUsername" class="form-input">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="regEmail" class="form-input">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="regPassword" class="form-input">
+            </div>
+            <button class="btn-primary" style="width:100%; margin-top: 1rem;" onclick="register()">Sign Up</button>
+            <p style="margin-top: 1.5rem; text-align:center; color:var(--text-dim);">
+                Already have an account? <a href="#" style="color:var(--primary);" onclick="toggleAuth()">Login</a>
+            </p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

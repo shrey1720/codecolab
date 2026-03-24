@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeCollab | Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <a href="index.html" class="logo"><span>CodeCollab</span></a>
+            <nav>
+                <ul>
+                    <li><a href="#" onclick="fetchQuestions(); return false;" class="active"><i class="fas fa-home"></i> Home</a></li>
+                    <li><a href="#" onclick="fetchQuestions('hot'); return false;"><i class="fas fa-fire"></i> Hot Feed</a></li>
+                    <li><a href="#" onclick="fetchQuestions('week'); return false;"><i class="fas fa-calendar-week"></i> This Week</a></li>
+                    <li><a href="#" onclick="fetchQuestions('month'); return false;"><i class="fas fa-calendar-alt"></i> This Month</a></li>
+                    <li><a href="#" onclick="fetchQuestions('bounty'); return false;"><i class="fas fa-coins"></i> Bounties</a></li>
+                    <li style="margin-top: 2rem; border-top: 1px solid var(--glass-border); padding-top: 1rem;">
+                        <a href="login.html" id="authLink"><i class="fas fa-user"></i> Login / Sign Up</a>
+                        <a href="#" id="logoutBtn" style="display:none;" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main>
+            <div class="header-row">
+                <div class="search-container">
+                    <i class="fas fa-search" style="position:absolute; left:18px; top:14px; color:#555;"></i>
+                    <input type="text" class="search-bar" placeholder="Search questions, tags, or bounties...">
+                </div>
+                <button class="btn-primary" onclick="showAskModal()"><i class="fas fa-plus"></i> Ask Question</button>
+            </div>
+
+            <div id="feedTitle" style="margin-bottom: 1.5rem; font-size: 1.5rem; font-weight: 700;">Recent Questions</div>
+            
+            <div class="feed" id="questionsList">
+                <!-- Questions will be dynamically loaded here -->
+                <div class="card shimmer" style="height: 150px;"></div>
+                <div class="card shimmer" style="height: 150px;"></div>
+            </div>
+        </main>
+
+        <!-- Right Side Stats -->
+        <aside class="trending">
+            <div id="userProfile" style="display: none; margin-bottom: 2rem;">
+                <h3 id="welcomeMsg">Welcome!</h3>
+                <div class="stat-box" style="margin-top: 1rem;">
+                    <span class="stat-val" id="userRep">0</span>
+                    <span class="stat-label">Reputation Points</span>
+                </div>
+            </div>
+
+            <h3>Community Stats</h3>
+            <div class="stat-box">
+                <span class="stat-val">1.2k</span>
+                <span class="stat-label">Active Developers</span>
+            </div>
+
+            <h3>Top Contributors</h3>
+            <div id="collaboratorsList" style="display:flex; flex-direction:column; gap:10px; margin-top:1rem;">
+                <div class="comment-meta">Loading leaderboard...</div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Modal for Asking Question -->
+    <div id="askModal" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); backdrop-filter:blur(10px); z-index:100; justify-content:center; align-items:center;">
+        <div class="auth-container" style="max-width: 600px; width:90%; position:relative;">
+            <button onclick="closeAskModal()" style="position:absolute; top:20px; right:20px; background:none; border:none; color:var(--text-dim); cursor:pointer;"><i class="fas fa-times"></i></button>
+            <h2 style="margin-bottom: 1.5rem;">Post a Question</h2>
+            <div class="form-group">
+                <label>Title</label>
+                <input type="text" id="qTitle" class="form-input" placeholder="What's your coding challenge?">
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea id="qDesc" class="form-input" style="height: 100px;" placeholder="Provide details..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Code (Optional)</label>
+                <textarea id="qCode" class="form-input" style="height: 150px; font-family: monospace;" placeholder="Paste your code here..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Tags (Comma separated)</label>
+                <input type="text" id="qTags" class="form-input" placeholder="java, spring, react">
+            </div>
+            <div class="form-group">
+                <label>Bounty Amount (Optional)</label>
+                <input type="number" id="qBounty" class="form-input" value="0">
+            </div>
+            <button class="btn-primary" style="width:100%;" onclick="submitQuestion()">Post Question</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
