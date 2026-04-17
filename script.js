@@ -1,12 +1,17 @@
 const API_BASE_URL =
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
         ? 'http://localhost:8080/api'
-        : 'https://ajt-be-3.onrender.com/api';
+        : `${window.location.origin}/api`;
 
 // State Management
 let currentUser = JSON.parse(localStorage.getItem('user'));
 let authToken = localStorage.getItem('token');
+let refreshToken = localStorage.getItem('refreshToken');
 let currentFilter = 'home';
+let notificationStream = null;
+let notifications = [];
+let unreadNotificationCount = 0;
+let currentQuestion = null;
 /** @type {Set<number>} */
 let myQuestionUpvotes = new Set();
 /** @type {Set<number>} */
@@ -14,12 +19,178 @@ let myAnswerUpvotes = new Set();
 
 // Initialization
 document.addEventListener('DOMContentLoaded', () => {
+    loadOAuthPayloadFromUrl();
     updateAuthUI();
+    initNotificationStream();
     if (window.location.pathname.endsWith('index.html') || window.location.pathname === '/' || window.location.pathname.endsWith('/')) {
         fetchQuestions();
         fetchTopContributors();
     }
 });
+
+function loadOAuthPayloadFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const payload = params.get('payload');
+    if (!payload) return;
+
+    try {
+        const auth = JSON.parse(decodeURIComponent(payload));
+        if (auth.token) {
+            authToken = auth.token;
+            refreshToken = auth.refreshToken;
+            currentUser = auth.user;
+            localStorage.setItem('token', authToken);
+            localStorage.setItem('refreshToken', refreshToken);
+            localStorage.setItem('user', JSON.stringify(currentUser));
+            updateAuthUI();
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    } catch (err) {
+        console.error('Failed to parse OAuth payload', err);
+    }
+}
+
+async function fetchWithAuth(url, options = {}) {
+    const merged = {
+        ...options,
+        headers: {
+            'Content-Type': 'application/json',
+            ...(options.headers || {}),
+            ...getAuthHeaders()
+        }
+    };
+
+    let response = await fetch(url, merged);
+    if (response.status === 401 && refreshToken) {
+        const refreshed = await refreshAuthToken();
+        if (refreshed) {
+            merged.headers = { ...merged.headers, ...getAuthHeaders() };
+            response = await fetch(url, merged);
+        }
+    }
+    return response;
+}
+
+async function refreshAuthToken() {
+    if (!refreshToken) return false;
+    try {
+        const response = await fetch(`${API_BASE_URL}/refresh-token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken })
+        });
+        if (!response.ok) {
+            logout();
+            return false;
+        }
+        const data = await response.json();
+        authToken = data.token;
+        refreshToken = data.refreshToken;
+        currentUser = data.user;
+        localStorage.setItem('token', authToken);
+        localStorage.setItem('refreshToken', refreshToken);
+        localStorage.setItem('user', JSON.stringify(currentUser));
+        updateAuthUI();
+        return true;
+    } catch (err) {
+        console.error('Refresh token failed', err);
+        logout();
+        return false;
+    }
+}
+
+function initNotificationStream() {
+    createNotificationPanel();
+    if (!currentUser || !window.EventSource) return;
+    try {
+        notificationStream = new EventSource(`${API_BASE_URL}/notifications/stream`);
+        notificationStream.onmessage = (event) => {
+            const payload = JSON.parse(event.data);
+            if (payload.type && payload.message) {
+                addNotification(payload);
+            }
+        };
+        notificationStream.onerror = () => {
+            console.warn('Notification stream disconnected, retrying...');
+            if (notificationStream) {
+                notificationStream.close();
+                setTimeout(initNotificationStream, 3000);
+            }
+        };
+    } catch (err) {
+        console.error('Failed to open notification stream', err);
+    }
+}
+
+function createNotificationPanel() {
+    const header = document.querySelector('.header-row');
+    if (!header || document.getElementById('notificationToggle')) return;
+
+    const notificationContainer = document.createElement('div');
+    notificationContainer.className = 'notification-container';
+    notificationContainer.innerHTML = `
+        <button id="notificationToggle" class="notification-button" onclick="toggleNotificationPanel()">
+            <i class="fas fa-bell"></i>
+            <span id="notificationBadge" class="notification-badge" style="display:none;">0</span>
+        </button>
+        <div id="notificationPanel" class="notification-panel" style="display:none;"></div>
+    `;
+    header.insertBefore(notificationContainer, header.firstChild);
+}
+
+function toggleNotificationPanel() {
+    const panel = document.getElementById('notificationPanel');
+    if (!panel) return;
+    panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+    if (panel.style.display === 'block') {
+        unreadNotificationCount = 0;
+        renderNotificationBadge();
+    }
+}
+
+function addNotification(payload) {
+    notifications.unshift(payload);
+    if (notifications.length > 20) notifications.pop();
+    unreadNotificationCount += 1;
+    renderNotificationBadge();
+    renderNotificationPanel();
+    toast(payload.message);
+}
+
+function renderNotificationBadge() {
+    const badge = document.getElementById('notificationBadge');
+    if (!badge) return;
+    if (unreadNotificationCount > 0) {
+        badge.style.display = 'block';
+        badge.textContent = unreadNotificationCount > 9 ? '9+' : String(unreadNotificationCount);
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+function renderNotificationPanel() {
+    const panel = document.getElementById('notificationPanel');
+    if (!panel) return;
+    if (notifications.length === 0) {
+        panel.innerHTML = '<div class="notification-empty">No notifications yet.</div>';
+        return;
+    }
+    panel.innerHTML = notifications.map(n => `
+        <div class="notification-item">
+            <div class="notification-type">${escapeHtml(n.type || 'update')}</div>
+            <div class="notification-message">${escapeHtml(n.message)}</div>
+            <div class="notification-meta">${new Date(n.timestamp).toLocaleTimeString()}</div>
+        </div>
+    `).join('');
+}
+
+function toast(message) {
+    const toastEl = document.createElement('div');
+    toastEl.className = 'toast-message';
+    toastEl.innerText = message;
+    document.body.appendChild(toastEl);
+    setTimeout(() => toastEl.remove(), 3000);
+}
 
 function updateAuthUI() {
     const authLink = document.getElementById('authLink');
@@ -56,7 +227,7 @@ async function loadMyVotes() {
     myAnswerUpvotes = new Set();
     if (!authToken) return;
     try {
-        const response = await fetch(`${API_BASE_URL}/votes/me`, { headers: getAuthHeaders() });
+        const response = await fetchWithAuth(`${API_BASE_URL}/votes/me`);
         if (!response.ok) return;
         const data = await response.json();
         (data.questionUpvotes || []).forEach((id) => myQuestionUpvotes.add(Number(id)));
@@ -174,12 +345,15 @@ async function loadQuestionDetails(id) {
         await loadMyVotes();
         const response = await fetch(`${API_BASE_URL}/question/${id}`);
         const q = await response.json();
+        currentQuestion = q;
 
         const detail = document.getElementById('questionDetail');
         const tagsHtml = q.tags ? q.tags.split(',').map(t => `<span class="tag">${t.trim()}</span>`).join('') : '';
         const codeHtml = q.code ? `<div class="code-block"><pre><code>${escapeHtml(q.code)}</code></pre></div>` : '';
         const qid = Number(q.id);
         const votedQ = currentUser && myQuestionUpvotes.has(qid);
+        const acceptedLabel = q.acceptedAnswerId ? `<span class="accepted-badge">Accepted answer #${q.acceptedAnswerId}</span>` : '';
+        const canAccept = currentUser && currentUser.id === q.userId && q.acceptedAnswerId == null;
 
         detail.innerHTML = `
             <div class="question-hero">
@@ -191,7 +365,10 @@ async function loadQuestionDetails(id) {
                             ${questionVoteChipHtml(q, votedQ)}
                         </span>
                     </div>
-                    ${q.bounty > 0 ? `<span class="bounty-tag">Bounty: ${q.bounty}</span>` : ''}
+                    <div>
+                        ${q.bounty > 0 ? `<span class="bounty-tag">Bounty: ${q.bounty}</span>` : ''}
+                        ${acceptedLabel}
+                    </div>
                 </div>
                 <h1 style="font-size:2rem; margin-bottom:1.5rem;">${escapeHtml(q.title)}</h1>
                 <p style="font-size:1.1rem; line-height:1.6; color:var(--text-main);">${escapeHtml(q.description || '')}</p>
@@ -229,7 +406,9 @@ async function loadAnswers(qId) {
             const card = document.createElement('div');
             card.className = 'card answer-card';
             card.style.cursor = 'default';
-            card.innerHTML = `
+            const isAccepted = currentQuestion && currentQuestion.acceptedAnswerId === a.id;
+        const canAcceptAnswer = currentQuestion && currentUser && currentQuestion.userId === currentUser.id && !currentQuestion.acceptedAnswerId;
+        card.innerHTML = `
                 <div class="card-meta card-meta-answer">
                     <span>Active Contributor: <strong>${escapeHtml(a.username)}</strong></span>
                     <span class="meta-dateline">
@@ -238,6 +417,8 @@ async function loadAnswers(qId) {
                     </span>
                 </div>
                 <p style="line-height:1.6;">${escapeHtml(a.answerText)}</p>
+                ${isAccepted ? '<div class="accepted-badge" style="margin-bottom:0.75rem;">Accepted answer</div>' : ''}
+                ${canAcceptAnswer ? `<button class="btn-secondary" style="margin-bottom:1rem;" onclick="acceptAnswer(${a.id})">Accept this answer</button>` : ''}
                 <div id="ansComments-${a.id}" class="comment-section"></div>
                 <div style="margin-top:1rem; margin-left:20px;">
                     <input type="text" id="ansCommentInput-${a.id}" class="form-input" style="width: 250px; font-size:0.8rem;" placeholder="Add a comment...">
@@ -279,9 +460,8 @@ async function addComment(parentId, type) {
     else body.answerId = parentId;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/comment`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/comment`, {
             method: 'POST',
-            headers: getAuthHeaders(),
             body: JSON.stringify(body)
         });
         if (response.ok) {
@@ -318,9 +498,8 @@ async function submitQuestion() {
     const body = { userId: currentUser.id, title, description: desc, code, tags, bounty };
 
     try {
-        const response = await fetch(`${API_BASE_URL}/question`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/question`, {
             method: 'POST',
-            headers: getAuthHeaders(),
             body: JSON.stringify(body)
         });
         if (response.ok) {
@@ -344,9 +523,8 @@ async function submitAnswer() {
     const qId = new URLSearchParams(window.location.search).get('id');
 
     try {
-        const response = await fetch(`${API_BASE_URL}/answer`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/answer`, {
             method: 'POST',
-            headers: getAuthHeaders(),
             body: JSON.stringify({ userId: currentUser.id, questionId: qId, answerText: text })
         });
         if (response.ok) {
@@ -365,9 +543,8 @@ async function vote(targetId, type, voteType) {
     else body.questionId = targetId;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/vote`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/vote`, {
             method: 'POST',
-            headers: getAuthHeaders(),
             body: JSON.stringify(body)
         });
         const data = await response.json().catch(() => ({}));
@@ -393,6 +570,26 @@ async function vote(targetId, type, voteType) {
     } catch (err) { console.error(err); }
 }
 
+async function acceptAnswer(answerId) {
+    if (!currentUser) return alert('Login required to accept answers');
+    const questionId = currentQuestion ? currentQuestion.id : new URLSearchParams(window.location.search).get('id');
+    if (!questionId || !answerId) return;
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/question/${questionId}/accept/${answerId}`, {
+            method: 'POST'
+        });
+        if (response.ok) {
+            toast('Answer accepted');
+            loadQuestionDetails(questionId);
+        } else {
+            const data = await response.json().catch(() => ({}));
+            alert(data.error || 'Could not accept answer');
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}
+
 // --- Auth ---
 
 async function login() {
@@ -409,11 +606,18 @@ async function login() {
             const data = await response.json();
             currentUser = data.user;
             authToken = data.token;
+            refreshToken = data.refreshToken || localStorage.getItem('refreshToken');
             localStorage.setItem('user', JSON.stringify(currentUser));
             localStorage.setItem('token', authToken);
+            if (refreshToken) {
+                localStorage.setItem('refreshToken', refreshToken);
+            }
             await loadMyVotes();
             window.location.href = 'index.html';
-        } else alert("Invalid credentials");
+        } else {
+            const body = await response.json().catch(() => ({}));
+            alert(body.error || "Invalid credentials");
+        }
     } catch (err) { console.error(err); }
 }
 
@@ -432,13 +636,17 @@ async function register() {
             const data = await response.json();
             currentUser = data.user;
             authToken = data.token;
+            refreshToken = data.refreshToken || localStorage.getItem('refreshToken');
             localStorage.setItem('user', JSON.stringify(currentUser));
             localStorage.setItem('token', authToken);
+            if (refreshToken) {
+                localStorage.setItem('refreshToken', refreshToken);
+            }
             await loadMyVotes();
             window.location.href = 'index.html';
-        } else if (response.status === 409) {
+        } else {
             const err = await response.json().catch(() => ({}));
-            alert(err.error || 'Username already exists');
+            alert(err.error || 'Registration failed');
         }
     } catch (err) { console.error(err); }
 }
@@ -446,14 +654,77 @@ async function register() {
 function logout() {
     localStorage.removeItem('user');
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
     currentUser = null;
     authToken = null;
+    refreshToken = null;
     window.location.reload();
+}
+
+function continueWithGoogle() {
+    window.location.href = `${API_BASE_URL}/oauth2/authorize/google`;
+}
+
+function showPasswordResetForm() {
+    document.getElementById('loginForm').style.display = 'none';
+    document.getElementById('registerForm').style.display = 'none';
+    document.getElementById('passwordResetForm').style.display = 'block';
+}
+
+function hidePasswordResetForm() {
+    document.getElementById('passwordResetForm').style.display = 'none';
+    document.getElementById('loginForm').style.display = 'block';
+}
+
+async function requestPasswordReset() {
+    const email = document.getElementById('resetEmail').value;
+    if (!email) return alert('Please enter your email');
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/request-password-reset`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        const data = await response.json();
+        alert(data.message || 'If this email exists, a reset token has been sent.');
+    } catch (err) {
+        console.error(err);
+        alert('Unable to request password reset right now.');
+    }
+}
+
+async function submitPasswordReset() {
+    const token = document.getElementById('resetToken').value;
+    const password = document.getElementById('newPassword').value;
+    if (!token || !password) return alert('Token and new password are required');
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/reset-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token, password })
+        });
+        const data = await response.json();
+        if (response.ok) {
+            alert(data.message || 'Password reset complete. You can now login with the new password.');
+            hidePasswordResetForm();
+        } else {
+            alert(data.error || 'Password reset failed');
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Unable to reset password right now.');
+    }
 }
 
 function toggleAuth() {
     const loginF = document.getElementById('loginForm');
     const registerF = document.getElementById('registerForm');
+    const resetF = document.getElementById('passwordResetForm');
+    if (resetF) {
+        resetF.style.display = 'none';
+    }
     if (loginF.style.display === 'none') {
         loginF.style.display = 'block';
         registerF.style.display = 'none';
@@ -461,6 +732,24 @@ function toggleAuth() {
         loginF.style.display = 'none';
         registerF.style.display = 'block';
     }
+}
+
+function showPasswordResetForm() {
+    const loginF = document.getElementById('loginForm');
+    const registerF = document.getElementById('registerForm');
+    const resetF = document.getElementById('passwordResetForm');
+    if (loginF) loginF.style.display = 'none';
+    if (registerF) registerF.style.display = 'none';
+    if (resetF) resetF.style.display = 'block';
+}
+
+function hidePasswordResetForm() {
+    const loginF = document.getElementById('loginForm');
+    const registerF = document.getElementById('registerForm');
+    const resetF = document.getElementById('passwordResetForm');
+    if (resetF) resetF.style.display = 'none';
+    if (loginF) loginF.style.display = 'block';
+    if (registerF) registerF.style.display = 'none';
 }
 
 async function fetchTopContributors() {
