@@ -1,7 +1,7 @@
 const API_BASE_URL =
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
         ? 'http://localhost:8080/api'
-        : `${window.location.origin}/api`;
+        : 'https://ajt-be-3.onrender.com/api';
 
 // State Management
 let currentUser = JSON.parse(localStorage.getItem('user'));
