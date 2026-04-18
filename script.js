@@ -408,6 +408,7 @@ async function loadAnswers(qId) {
             card.style.cursor = 'default';
             const isAccepted = currentQuestion && currentQuestion.acceptedAnswerId === a.id;
         const canAcceptAnswer = currentQuestion && currentUser && currentQuestion.userId === currentUser.id && !currentQuestion.acceptedAnswerId;
+        const canAwardBounty = currentQuestion && currentQuestion.bounty > 0 && currentUser && currentQuestion.userId === currentUser.id && a.userId !== currentUser.id;
         card.innerHTML = `
                 <div class="card-meta card-meta-answer">
                     <span>Active Contributor: <strong>${escapeHtml(a.username)}</strong></span>
@@ -418,7 +419,10 @@ async function loadAnswers(qId) {
                 </div>
                 <p style="line-height:1.6;">${escapeHtml(a.answerText)}</p>
                 ${isAccepted ? '<div class="accepted-badge" style="margin-bottom:0.75rem;">Accepted answer</div>' : ''}
-                ${canAcceptAnswer ? `<button class="btn-secondary" style="margin-bottom:1rem;" onclick="acceptAnswer(${a.id})">Accept this answer</button>` : ''}
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                    ${canAcceptAnswer ? `<button class="btn-secondary" style="margin-bottom:1rem;" onclick="acceptAnswer(${a.id})">Accept this answer</button>` : ''}
+                    ${canAwardBounty ? `<button class="btn-primary" style="margin-bottom:1rem; background:var(--accent-gold); color:#111; font-weight:700;" onclick="awardBounty(${a.id})"><i class="fas fa-coins"></i> Award Bounty (${currentQuestion.bounty} Rep)</button>` : ''}
+                </div>
                 <div id="ansComments-${a.id}" class="comment-section"></div>
                 <div style="margin-top:1rem; margin-left:20px;">
                     <input type="text" id="ansCommentInput-${a.id}" class="form-input" style="width: 250px; font-size:0.8rem;" placeholder="Add a comment...">
@@ -587,6 +591,33 @@ async function acceptAnswer(answerId) {
         }
     } catch (err) {
         console.error(err);
+    }
+}
+
+async function awardBounty(answerId) {
+    if (!currentUser) return alert('Login required to award bounty');
+    const questionId = currentQuestion ? currentQuestion.id : new URLSearchParams(window.location.search).get('id');
+    if (!questionId || !answerId) return;
+
+    const bountyAmount = currentQuestion ? currentQuestion.bounty : 0;
+    if (bountyAmount <= 0) return alert('This question has no bounty to award');
+
+    if (!confirm(`Are you sure you want to award ${bountyAmount} reputation points to this answer\'s author? This action cannot be undone.`)) return;
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE_URL}/question/${questionId}/award-bounty/${answerId}`, {
+            method: 'POST'
+        });
+        const data = await response.json().catch(() => ({}));
+        if (response.ok) {
+            toast(`Bounty of ${bountyAmount} reputation points awarded!`);
+            loadQuestionDetails(questionId);
+        } else {
+            alert(data.error || 'Could not award bounty');
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Failed to award bounty. Please try again.');
     }
 }
 
