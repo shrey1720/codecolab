@@ -399,7 +399,7 @@ async function loadQuestionDetails(id) {
             </div>
             <div style="margin-top:1rem;">
                 <input type="text" id="qCommentInput" class="form-input" style="width: 300px; display:inline-block;" placeholder="Add a comment...">
-                <button class="btn-primary" style="padding: 0.5rem 1rem;" onclick="addComment(${q.id}, 'question')">Post</button>
+                <button class="btn-primary" style="padding: 0.5rem 1rem;" onclick="addComment(${q.id}, 'question')">Send Anonymous Solution</button>
             </div>
         `;
 
@@ -445,7 +445,7 @@ async function loadAnswers(qId) {
                 <div id="ansComments-${a.id}" class="comment-section"></div>
                 <div style="margin-top:1rem; margin-left:20px;">
                     <input type="text" id="ansCommentInput-${a.id}" class="form-input" style="width: 250px; font-size:0.8rem;" placeholder="Add a comment...">
-                    <button class="btn-primary" style="padding: 0.25rem 0.75rem; font-size:0.8rem;" onclick="addComment(${a.id}, 'answer')">Post</button>
+                    <button class="btn-primary" style="padding: 0.25rem 0.75rem; font-size:0.8rem;" onclick="addComment(${a.id}, 'answer')">Send Anonymous Solution</button>
                 </div>
             `;
             list.appendChild(card);
