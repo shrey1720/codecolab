@@ -275,19 +275,38 @@ async function fetchQuestions(filter = '') {
 
     // Update active UI state
     document.querySelectorAll('.sidebar nav a').forEach(a => a.classList.remove('active'));
+    
+    // Default to Top Contributors
+    const leaderboardTitle = document.getElementById('leaderboardTitle');
+    if (leaderboardTitle) leaderboardTitle.innerText = "Top Contributors";
+
     if (filter) {
         const activeLink = document.querySelector(`a[onclick*="'${filter}'"]`);
         if (activeLink) activeLink.classList.add('active');
         title.innerText = filter.charAt(0).toUpperCase() + filter.slice(1) + " Feed";
+        
+        if (filter === 'bounty') {
+            if (leaderboardTitle) leaderboardTitle.innerText = "Top Bounties";
+            fetchTopBounties();
+        } else {
+            fetchTopContributors();
+        }
     } else {
         document.querySelector('a[onclick*="fetchQuestions()"]').classList.add('active');
         title.innerText = "Recent Questions";
+        fetchTopContributors();
     }
 
     currentFilter = filter === '' ? 'home' : filter;
     try {
         const response = await fetch(`${API_BASE_URL}/questions${filter ? '?filter=' + filter : ''}`);
+        if (!response.ok) {
+            throw new Error(`API returned status ${response.status}`);
+        }
         const data = await response.json();
+        if (!Array.isArray(data)) {
+            throw new Error("API did not return an array");
+        }
         await loadMyVotes();
         renderQuestions(data);
     } catch (err) {
@@ -788,11 +807,37 @@ async function fetchTopContributors() {
     if (!list) return;
     try {
         const response = await fetch(`${API_BASE_URL}/users/top`);
+        if (!response.ok) throw new Error("Could not fetch top contributors");
         const users = await response.json();
         list.innerHTML = users.map(u => `
             <div class="leaderboard-item">
                 <span class="leaderboard-name">${u.username}</span>
                 <span class="leaderboard-rep">${u.reputation} Rep</span>
+            </div>
+        `).join('');
+    } catch (err) { console.error(err); }
+}
+
+async function fetchTopBounties() {
+    const list = document.getElementById('collaboratorsList');
+    if (!list) return;
+    try {
+        const response = await fetch(`${API_BASE_URL}/questions?filter=bounty`);
+        if (!response.ok) throw new Error("Could not fetch top bounties");
+        const questions = await response.json();
+        
+        // Take top 5 bounties
+        const topBounties = questions.sort((a, b) => b.bounty - a.bounty).slice(0, 5);
+        
+        if (topBounties.length === 0) {
+            list.innerHTML = '<div class="comment-meta">No bounties available</div>';
+            return;
+        }
+
+        list.innerHTML = topBounties.map(q => `
+            <div class="leaderboard-item" style="cursor:pointer;" onclick="window.location.href='question.html?id=${q.id}'">
+                <span class="leaderboard-name" style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 150px;">${escapeHtml(q.title)}</span>
+                <span class="leaderboard-rep" style="color:var(--accent-gold);"><i class="fas fa-coins"></i> ${q.bounty}</span>
             </div>
         `).join('');
     } catch (err) { console.error(err); }
