@@ -50,12 +50,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    const path = window.location.pathname;
-    if (path.endsWith('index.html') || path === '/' || path.endsWith('/') || path.includes('index.html')) {
+    if (path.includes('index.html') || path === '/' || path.endsWith('/') || path.includes('index.html')) {
         fetchQuestions();
         fetchTopContributors();
     } else if (path.includes('profile.html')) {
         loadUserProfile();
+        fetchTopContributors();
+    } else if (path.includes('question.html')) {
         fetchTopContributors();
     }
 });
