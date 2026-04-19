@@ -16,17 +16,68 @@ let currentQuestion = null;
 let myQuestionUpvotes = new Set();
 /** @type {Set<number>} */
 let myAnswerUpvotes = new Set();
+let allQuestions = [];
 
 // Initialization
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     loadOAuthPayloadFromUrl();
+    await checkSession(); // Proactive session check
     updateAuthUI();
     initNotificationStream();
-    if (window.location.pathname.endsWith('index.html') || window.location.pathname === '/' || window.location.pathname.endsWith('/')) {
+    
+    const searchBar = document.querySelector('.search-bar');
+    if (searchBar) {
+        searchBar.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            if (!query) {
+                renderQuestions(allQuestions);
+                return;
+            }
+            const filtered = allQuestions.filter(q => {
+                const titleMatch = q.title && q.title.toLowerCase().includes(query);
+                const tagsMatch = q.tags && q.tags.toLowerCase().includes(query);
+                const descMatch = q.description && q.description.toLowerCase().includes(query);
+                return titleMatch || tagsMatch || descMatch;
+            });
+            renderQuestions(filtered);
+        });
+    }
+
+    const path = window.location.pathname;
+    if (path.endsWith('index.html') || path === '/' || path.endsWith('/') || path.includes('index.html')) {
         fetchQuestions();
+        fetchTopContributors();
+    } else if (path.includes('profile.html')) {
+        loadUserProfile();
         fetchTopContributors();
     }
 });
+
+async function checkSession() {
+    if (!authToken && !refreshToken) return;
+    
+    try {
+        // First, try a simple "me" call to see if token is still good
+        const response = await fetch(`${API_BASE_URL}/me`, {
+            headers: getAuthHeaders()
+        });
+        
+        if (response.status === 401 && refreshToken) {
+            // Token expired, try refreshing
+            const success = await refreshAuthToken();
+            if (!success) {
+                console.warn("Session expired and refresh failed.");
+                // logout(); // Optional: force logout if absolutely unrecoverable
+            }
+        } else if (response.ok) {
+            const data = await response.json();
+            currentUser = data.user;
+            localStorage.setItem('user', JSON.stringify(currentUser));
+        }
+    } catch (err) {
+        console.error("Session check failed", err);
+    }
+}
 
 function loadOAuthPayloadFromUrl() {
     const params = new URLSearchParams(window.location.search);
@@ -195,22 +246,37 @@ function toast(message) {
 function updateAuthUI() {
     const authLink = document.getElementById('authLink');
     const logoutBtn = document.getElementById('logoutBtn');
-    const userProfile = document.getElementById('userProfile');
+    const userProfileEl = document.getElementById('userProfile');
     const welcomeMsg = document.getElementById('welcomeMsg');
     const userRep = document.getElementById('userRep');
+    const notificationToggle = document.getElementById('notificationToggle');
+    const sidebarNav = document.querySelector('.sidebar nav ul');
 
-    if (currentUser) {
+    if (authToken && currentUser) {
         if (authLink) authLink.style.display = 'none';
         if (logoutBtn) logoutBtn.style.display = 'flex';
-        if (userProfile) {
-            userProfile.style.display = 'block';
-            welcomeMsg.innerText = `Hi, ${currentUser.username}!`;
-            userRep.innerText = currentUser.reputation || 0;
+        if (userProfileEl) userProfileEl.style.display = 'block';
+        if (welcomeMsg) welcomeMsg.textContent = `Welcome, ${currentUser.username}!`;
+        if (userRep) userRep.textContent = currentUser.reputation || 0;
+        if (notificationToggle) notificationToggle.style.display = 'flex';
+        
+        // Add Profile link if not present
+        if (sidebarNav && !document.getElementById('profileSidebarLink')) {
+            const li = document.createElement('li');
+            li.id = 'profileSidebarLink';
+            li.innerHTML = `<a href="profile.html"><i class="fas fa-user-circle"></i> <span>Profile</span></a>`;
+            // Insert before logout/auth section
+            const authLi = authLink ? authLink.parentElement : (logoutBtn ? logoutBtn.parentElement : null);
+            if (authLi) sidebarNav.insertBefore(li, authLi);
+            else sidebarNav.appendChild(li);
         }
     } else {
         if (authLink) authLink.style.display = 'flex';
         if (logoutBtn) logoutBtn.style.display = 'none';
-        if (userProfile) userProfile.style.display = 'none';
+        if (userProfileEl) userProfileEl.style.display = 'none';
+        if (notificationToggle) notificationToggle.style.display = 'none';
+        const pLink = document.getElementById('profileSidebarLink');
+        if (pLink) pLink.remove();
     }
 }
 
@@ -307,6 +373,7 @@ async function fetchQuestions(filter = '') {
         if (!Array.isArray(data)) {
             throw new Error("API did not return an array");
         }
+        allQuestions = data;
         await loadMyVotes();
         renderQuestions(data);
     } catch (err) {
@@ -368,7 +435,27 @@ async function loadQuestionDetails(id) {
 
         const detail = document.getElementById('questionDetail');
         const tagsHtml = q.tags ? q.tags.split(',').map(t => `<span class="tag">${t.trim()}</span>`).join('') : '';
-        const codeHtml = q.code ? `<div class="code-block"><pre><code>${escapeHtml(q.code)}</code></pre></div>` : '';
+        const codeActionsHtml = q.code ? `
+            <div class="code-actions-container">
+                <span class="ai-group-label">AI Analysis Suite</span>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+                    <button class="btn-ai" onclick="analyzeCode('bugs')"><i class="fas fa-bug"></i> Find Bugs</button>
+                    <button class="btn-ai" onclick="analyzeCode('complexity')"><i class="fas fa-microchip"></i> Big O Analysis</button>
+                    <button class="btn-ai" onclick="analyzeCode('optimize')"><i class="fas fa-rocket"></i> Optimize</button>
+                    <button class="btn-ai" onclick="analyzeCode('explain')"><i class="fas fa-magic"></i> Explain</button>
+                </div>
+                
+                <span class="ai-group-label">Developer Tools</span>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="btn-util" onclick="runCodeInBrowser()"><i class="fas fa-play"></i> Run Code</button>
+                    <button class="btn-util" onclick="copyQuestionCode()"><i class="fas fa-copy"></i> Copy</button>
+                    <button class="btn-util" onclick="downloadCode()"><i class="fas fa-download"></i> Download</button>
+                    <button class="btn-util" onclick="shareToCarbon()"><i class="fas fa-share-alt"></i> Share Image</button>
+                </div>
+            </div>
+            <div id="codeRunOutput" class="output-container" style="display:none;"></div>
+        ` : '';
+        const codeHtml = q.code ? `<div class="code-block" style="margin-bottom: 0;"><pre><code>${escapeHtml(q.code)}</code></pre></div>${codeActionsHtml}` : '';
         const qid = Number(q.id);
         const votedQ = currentUser && myQuestionUpvotes.has(qid);
         const acceptedLabel = q.acceptedAnswerId ? `<span class="accepted-badge">Accepted answer #${q.acceptedAnswerId}</span>` : '';
@@ -456,15 +543,26 @@ async function loadAnswers(qId) {
 
 async function loadComments(id, type, containerId) {
     const container = document.getElementById(containerId);
+    if (!container) return;
     try {
         const response = await fetch(`${API_BASE_URL}/comments/${id}?type=${type}`);
         const comments = await response.json();
-        container.innerHTML = comments.map(c => `
+        
+        // Safety check to ensure comments is an array
+        if (!Array.isArray(comments)) {
+            container.innerHTML = '<div class="comment-meta">No comments yet or could not load.</div>';
+            return;
+        }
+
+        container.innerHTML = comments.length > 0 ? comments.map(c => `
             <div class="comment">
                 ${escapeHtml(c.commentText)} — <span class="comment-meta"><strong>${c.username}</strong> on ${new Date(c.createdAt).toLocaleDateString()}</span>
             </div>
-        `).join('');
-    } catch (err) { console.error(err); }
+        `).join('') : '<div class="comment-meta">No comments yet.</div>';
+    } catch (err) { 
+        console.error("Load comments error:", err);
+        container.innerHTML = '<div class="comment-meta">Error loading comments.</div>';
+    }
 }
 
 async function addComment(parentId, type) {
@@ -848,4 +946,164 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// --- Advanced Code Features ---
+async function runCodeInBrowser() {
+    if (!currentQuestion || !currentQuestion.code) return;
+    const code = currentQuestion.code;
+    const tags = (currentQuestion.tags || '').toLowerCase();
+    
+    // Map basic tags to wandbox compilers
+    let compiler = 'nodejs-20.17.0'; // Default to JS
+    if (tags.includes('python')) { compiler = 'cpython-3.14.0'; }
+    else if (tags.includes('java')) { compiler = 'openjdk-jdk-22+36'; }
+    else if (tags.includes('cpp') || tags.includes('c++')) { compiler = 'gcc-head'; }
+    else if (tags.includes('c')) { compiler = 'gcc-head-c'; }
+    else if (tags.includes('php')) { compiler = 'php-8.3.12'; }
+    else if (tags.includes('ruby')) { compiler = 'ruby-3.4.9'; }
+
+    const outputDiv = document.getElementById('codeRunOutput');
+    outputDiv.style.display = 'block';
+    outputDiv.innerHTML = '<span style="color:#888;">Executing code remotely...</span>';
+    
+    try {
+        const response = await fetch('https://wandbox.org/api/compile.json', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                compiler: compiler,
+                code: code,
+                save: false
+            })
+        });
+        const data = await response.json();
+        
+        let outputText = '';
+        if (data.program_message) outputText += data.program_message;
+        if (data.compiler_message) outputText += '\n[Compiler Notes/Errors]:\n' + data.compiler_message;
+        if (!outputText && data.status === "0") outputText += 'Code executed successfully but returned no output.';
+        
+        outputDiv.textContent = outputText.trim() || 'Error executing or no output returned.';
+    } catch (err) {
+        outputDiv.textContent = 'Failed to execute code. ' + err.message;
+    }
+}
+
+function analyzeCode(type) {
+    if (!currentQuestion || !currentQuestion.code) return;
+    const code = currentQuestion.code;
+    const lang = (currentQuestion.tags || 'code').split(',')[0].trim();
+    
+    let prompt = "";
+    if (type === 'bugs') {
+        prompt = `Identify any logic errors, security vulnerabilities, or performance bottlenecks in this ${lang} snippet. Explain why they are issues and how to fix them:\n\n${code}`;
+        toast("Scanning for bugs via Perplexity AI...");
+    } else if (type === 'complexity') {
+        prompt = `Analyze the Time and Space complexity (Big O) of this ${lang} code. Break down each part of the algorithm:\n\n${code}`;
+        toast("Analyzing complexity via Perplexity AI...");
+    } else if (type === 'optimize') {
+        prompt = `Provide a highly optimized and refactored version of this ${lang} code. Focus on performance and clean code principles:\n\n${code}`;
+        toast("Refactoring code via Perplexity AI...");
+    } else {
+        prompt = `Explain how this ${lang} code works in detail for a beginner:\n\n${code}`;
+        toast("Generating explanation via Perplexity AI...");
+    }
+
+    const url = `https://www.perplexity.ai/search?q=${encodeURIComponent(prompt)}`;
+    window.open(url, '_blank');
+}
+
+function downloadCode() {
+    if (!currentQuestion || !currentQuestion.code) return;
+    const tags = (currentQuestion.tags || '').toLowerCase();
+    let ext = 'txt';
+    if (tags.includes('java')) ext = 'java';
+    else if (tags.includes('python')) ext = 'py';
+    else if (tags.includes('javascript') || tags.includes('js')) ext = 'js';
+    else if (tags.includes('cpp') || tags.includes('c++')) ext = 'cpp';
+    else if (tags.includes('html')) ext = 'html';
+    else if (tags.includes('css')) ext = 'css';
+
+    const blob = new Blob([currentQuestion.code], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `snippet_${currentQuestion.id}.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast("Download started...");
+}
+
+function shareToCarbon() {
+    if (!currentQuestion || !currentQuestion.code) return;
+    const url = `https://carbon.now.sh/?code=${encodeURIComponent(currentQuestion.code)}&l=auto`;
+    window.open(url, '_blank');
+}
+
+function copyQuestionCode() {
+    if (!currentQuestion || !currentQuestion.code) return;
+    navigator.clipboard.writeText(currentQuestion.code).then(() => {
+        toast("Code copied to clipboard!");
+    }).catch(err => {
+        console.error("Failed to copy code: ", err);
+    });
+}
+async function loadUserProfile() {
+    if (!currentUser) return;
+    
+    // Update basic UI elements on profile page
+    const userInitial = document.getElementById('userInitial');
+    const uName = document.getElementById('profUsername');
+    const uRole = document.getElementById('profRole');
+    const uEmail = document.getElementById('profEmail');
+    const uRep = document.getElementById('profRep');
+    const eBadge = document.getElementById('emailStatusBadge');
+
+    if (uName) {
+        userInitial.textContent = currentUser.username.charAt(0).toUpperCase();
+        uName.textContent = currentUser.username;
+        uRole.textContent = currentUser.role || 'CONTRIBUTOR';
+        uEmail.textContent = currentUser.email || 'No email provided';
+        uRep.textContent = currentUser.reputation || 0;
+        
+        // Fetch detailed profile from /me (contains refreshed emailVerified status)
+        try {
+            const resp = await fetchWithAuth(`${API_BASE_URL}/me`);
+            if (resp.ok) {
+                const data = await resp.json();
+                const u = data.user;
+                if (eBadge) {
+                    eBadge.textContent = u.emailVerified ? 'Verified Account' : 'Unverified';
+                    eBadge.style.background = u.emailVerified ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.05)';
+                    eBadge.style.color = u.emailVerified ? 'var(--accent-success)' : 'var(--text-dim)';
+                }
+            }
+        } catch (err) { console.error(err); }
+    }
+
+    // Load recent activity (for now, let's just fetch all questions and filter for user)
+    try {
+        const resp = await fetch(`${API_BASE_URL}/questions`);
+        if (resp.ok) {
+            const questions = await resp.json();
+            const userQ = questions.filter(q => q.userId === currentUser.id);
+            const activityList = document.getElementById('recentActivity');
+            if (activityList) {
+                if (userQ.length === 0) {
+                    activityList.innerHTML = '<div class="comment-meta">No questions asked yet.</div>';
+                } else {
+                    activityList.innerHTML = userQ.slice(0, 5).map(q => `
+                        <div class="comment" style="cursor:pointer;" onclick="window.location.href='question.html?id=${q.id}'">
+                            <div class="notification-type">QUESTION POSTED</div>
+                            <div style="font-weight:600;">${escapeHtml(q.title)}</div>
+                            <div class="comment-meta">${new Date(q.createdAt).toLocaleDateString()}</div>
+                        </div>
+                    `).join('');
+                }
+            }
+        }
+    } catch (err) { console.error(err); }
 }

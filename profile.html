@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile | CodeCollab</title>
+    <link rel="stylesheet" href="styles.css?v=3">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="dashboard">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <a href="index.html" class="logo">CodeCollab</a>
+            <nav>
+                <ul>
+                    <li><a href="index.html"><i class="fas fa-home"></i> <span>Home</span></a></li>
+                    <li><a href="index.html#hot"><i class="fas fa-fire"></i> <span>Hot Feed</span></a></li>
+                    <li><a href="index.html#bounty"><i class="fas fa-coins"></i> <span>Bounties</span></a></li>
+                    <li style="margin-top: 2rem; border-top: 1px solid var(--card-border); padding-top: 1rem;">
+                        <a href="login.html" id="authLink" style="display:none;"><i class="fas fa-user"></i> <span>Login / Sign Up</span></a>
+                        <a href="#" id="logoutBtn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main>
+            <div class="header-row">
+                <h1 style="margin:0;">User Profile</h1>
+            </div>
+
+            <div id="profileContainer">
+                <!-- User basic info card -->
+                <div class="card" style="margin-bottom: 2rem; cursor: default;">
+                    <div style="display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;">
+                        <div style="width: 100px; height: 100px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 3rem; font-weight: 800; color: white;" id="userInitial">
+                            ?
+                        </div>
+                        <div style="flex: 1; min-width: 200px;">
+                            <h2 style="margin:0;" id="profUsername">Loading...</h2>
+                            <p style="margin: 0.5rem 0; color: var(--accent-gold);" id="profRole">USER</p>
+                            <p style="color: var(--text-dim);" id="profEmail">...</p>
+                        </div>
+                        <div class="stat-box" style="margin: 0; min-width: 150px; text-align: center;">
+                            <span class="stat-val" id="profRep">0</span>
+                            <span class="stat-label">Reputation</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                    <div>
+                        <h3 style="margin-bottom: 1rem;">Recent Activity</h3>
+                        <div id="recentActivity" class="feed">
+                            <div class="comment-meta">Fetching activity...</div>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 style="margin-bottom: 1rem;">Account Security</h3>
+                        <div class="card" style="cursor: default;">
+                            <div style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                                <span>Email Status</span>
+                                <span id="emailStatusBadge" class="tag">Unverified</span>
+                            </div>
+                            <p style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 1rem;">Verified accounts get access to advanced collaborative features.</p>
+                            <button class="btn-secondary" style="width: 100%; border-color: var(--primary); color: var(--primary);" onclick="window.location.href='index.html'">Return to Feed</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Side Stats -->
+        <aside class="trending">
+            <h3>Leaderboard Position</h3>
+            <div id="collaboratorsList" style="display:flex; flex-direction:column; gap:10px;">
+                <div class="comment-meta">Loading contributors...</div>
+            </div>
+        </aside>
+    </div>
+
+    <script src="script.js?v=3"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!localStorage.getItem('token')) {
+                window.location.href = 'login.html';
+                return;
+            }
+            loadUserProfile();
+        });
+    </script>
+</body>
+
+</html>

@@ -1,12 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Question Details | CodeCollab</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Intelligence Tools & Utilities -->
+    <link rel="stylesheet" href="styles.css?v=3">
 </head>
+
 <body>
     <div class="dashboard">
         <!-- Sidebar Navigation -->
@@ -17,6 +21,10 @@
                     <li><a href="index.html"><i class="fas fa-home"></i> <span>Home</span></a></li>
                     <li><a href="index.html#hot"><i class="fas fa-fire"></i> <span>Hot Feed</span></a></li>
                     <li><a href="index.html#bounty"><i class="fas fa-coins"></i> <span>Bounties</span></a></li>
+                    <li style="margin-top: 2rem; border-top: 1px solid var(--card-border); padding-top: 1rem;">
+                        <a href="login.html" id="authLink"><i class="fas fa-user"></i> <span>Login / Sign Up</span></a>
+                        <a href="#" id="logoutBtn" style="display:none;" onclick="logout()"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
+                    </li>
                 </ul>
             </nav>
         </aside>
@@ -28,7 +36,8 @@
                 <div class="card shimmer" style="height: 300px;"></div>
             </div>
 
-            <div style="margin-top: 3rem; margin-bottom: 1.5rem; display:flex; justify-content:space-between; align-items:center;">
+            <div
+                style="margin-top: 3rem; margin-bottom: 1.5rem; display:flex; justify-content:space-between; align-items:center;">
                 <h2 id="answerCount">Solutions</h2>
                 <button class="btn-primary" onclick="showAnswerBox()">Provide Solution</button>
             </div>
@@ -50,19 +59,23 @@
     </div>
 
     <!-- Modal for Answer -->
-    <div id="answerModal" class="modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); backdrop-filter:blur(10px); z-index:100; justify-content:center; align-items:center;">
+    <div id="answerModal" class="modal-overlay"
+        style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); backdrop-filter:blur(10px); z-index:100; justify-content:center; align-items:center;">
         <div class="auth-container" style="max-width: 600px; width:90%; position:relative;">
-            <button onclick="closeAnswerModal()" style="position:absolute; top:20px; right:20px; background:none; border:none; color:var(--text-dim); cursor:pointer;"><i class="fas fa-times"></i></button>
+            <button onclick="closeAnswerModal()"
+                style="position:absolute; top:20px; right:20px; background:none; border:none; color:var(--text-dim); cursor:pointer;"><i
+                    class="fas fa-times"></i></button>
             <h2 style="margin-bottom: 1.5rem;">Your Solution</h2>
             <div class="form-group">
                 <label>Explanation</label>
-                <textarea id="ansText" class="form-input" style="height: 200px;" placeholder="Write your answer..."></textarea>
+                <textarea id="ansText" class="form-input" style="height: 200px;"
+                    placeholder="Write your answer..."></textarea>
             </div>
             <button class="btn-primary" style="width:100%;" onclick="submitAnswer()">Post Solution</button>
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=3"></script>
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const questionId = urlParams.get('id');
@@ -71,4 +84,5 @@
         }
     </script>
 </body>
+
 </html>

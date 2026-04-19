@@ -739,3 +739,70 @@ h3 {
     from { opacity: 0; transform: translateY(12px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* Intelligence Suite Styles */
+.code-actions-container {
+    background: rgba(18, 18, 18, 0.8);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 20px;
+}
+
+.ai-group-label {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--accent-gold);
+    text-transform: uppercase;
+    font-weight: 800;
+    margin-bottom: 8px;
+    letter-spacing: 0.05em;
+}
+
+.btn-ai {
+    background: linear-gradient(135deg, rgba(195, 155, 75, 0.15), rgba(195, 155, 75, 0.05));
+    border: 1px solid rgba(195, 155, 75, 0.3) !important;
+    color: var(--accent-gold) !important;
+    font-size: 0.75rem !important;
+    padding: 6px 12px !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.btn-ai:hover {
+    background: rgba(195, 155, 75, 0.25) !important;
+    border-color: var(--accent-gold) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(195, 155, 75, 0.2);
+}
+
+.btn-util {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #999;
+    font-size: 0.75rem;
+    padding: 6px 12px;
+    border-radius: var(--radius);
+    transition: all 0.2s ease;
+}
+
+.btn-util:hover {
+    background: #252525;
+    color: #fff;
+    border-color: #555;
+}
+
+.output-container {
+    background: #000;
+    color: #0f0;
+    padding: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    white-space: pre-wrap;
+    font-size: 0.85rem;
+    border: 1px solid #333;
+}
