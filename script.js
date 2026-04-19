@@ -21,9 +21,16 @@ let allQuestions = [];
 // Initialization
 document.addEventListener('DOMContentLoaded', async () => {
     loadOAuthPayloadFromUrl();
-    await checkSession(); // Proactive session check
-    updateAuthUI();
-    initNotificationStream();
+    
+    // Attempt session update but don't block UI initialization
+    checkSession().then(() => {
+        updateAuthUI();
+        initNotificationStream();
+    }).catch(err => {
+        console.error("Critical: Initial session check failed", err);
+        updateAuthUI();
+        initNotificationStream();
+    });
     
     const searchBar = document.querySelector('.search-bar');
     if (searchBar) {
@@ -151,25 +158,60 @@ async function refreshAuthToken() {
 }
 
 function initNotificationStream() {
-    createNotificationPanel();
-    if (!currentUser || !window.EventSource) return;
+    if (notificationStream) return;
+
+    let wsUrl = API_BASE_URL.replace('/api', '/api/ws/notifications')
+                            .replace('http://', 'ws://')
+                            .replace('https://', 'wss://');
+
+    console.log("[Bridge] Connecting to real-time events at:", wsUrl);
+    
     try {
-        notificationStream = new EventSource(`${API_BASE_URL}/notifications/stream`);
+        notificationStream = new WebSocket(wsUrl);
+
+        notificationStream.onopen = () => {
+            console.log("[Bridge] Real-time notification channel active.");
+        };
+
         notificationStream.onmessage = (event) => {
-            const payload = JSON.parse(event.data);
-            if (payload.type && payload.message) {
-                addNotification(payload);
+            try {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'connection_established') return;
+
+                // Show a toast for incoming activities
+                if (data.type === 'answer_posted' || data.type === 'comment_posted' || data.type === 'bounty_awarded') {
+                    const message = data.message || "New activity on CodeCollab!";
+                    toast(`🔔 ${message}`);
+                    
+                    // Update notifications list if open
+                    notifications.unshift({
+                        id: Date.now(),
+                        message: message,
+                        type: data.type,
+                        details: data.details,
+                        createdAt: new Date(),
+                        unread: true
+                    });
+                    unreadNotificationCount++;
+                    updateNotificationUI();
+                }
+            } catch (err) {
+                console.error("Failed to parse real-time event", err);
             }
         };
-        notificationStream.onerror = () => {
-            console.warn('Notification stream disconnected, retrying...');
-            if (notificationStream) {
-                notificationStream.close();
-                setTimeout(initNotificationStream, 3000);
-            }
+
+        notificationStream.onclose = () => {
+            console.log("[Bridge] Connection lost. Retrying in 5s...");
+            notificationStream = null;
+            setTimeout(initNotificationStream, 5000);
+        };
+
+        notificationStream.onerror = (err) => {
+            console.error("WebSocket Error", err);
         };
     } catch (err) {
-        console.error('Failed to open notification stream', err);
+        console.error("Failed to initialize WebSocket stream", err);
     }
 }
 
