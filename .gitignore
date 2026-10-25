@@ -1,3 +1,11 @@
 *.log
 frontend_final_log.txt
+backend_resilience_log.txt
 .vscode/
+.DS_Store
+Thumbs.db
+node_modules/
+coverage/
+.env
+.env.*
+!.env.example
